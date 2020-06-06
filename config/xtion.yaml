@@ -1,5 +1,5 @@
 image_topic: "/camera/rgb/image_rect_color"
 cam_info_topic: "/camera/rgb/camera_info"
 depth_topic: "/camera/depth_registered/sw_registered/image_rect"
-mm_to_meters: true
+mm_to_meters: false
 image_freq: 30

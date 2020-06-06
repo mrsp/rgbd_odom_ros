@@ -8,8 +8,6 @@ const float MAX_DEPTH = 4.0f;       // in meters
 const float MAX_DEPTH_DIFF = 0.08f; // in meters
 const float MAX_POINTS_PART = 0.09f;
 
-// This is for TUM dataset
-const float PIXEL_TO_METER_SCALEFACTOR = 0.0002;
 
 rgbd_odom::rgbd_odom(ros::NodeHandle nh_) : it(nh_)
 {
@@ -39,6 +37,7 @@ rgbd_odom::rgbd_odom(ros::NodeHandle nh_) : it(nh_)
     n_p.param<std::string>("image_topic", image_topic, "/camera/rgb/image_rect_color");
     n_p.param<std::string>("depth_topic", depth_topic, "/camera/depth_registered/sw_registered/image_rect");
     n_p.param<std::string>("cam_info_topic", cam_info_topic, "/camera/rgb/camera_info");
+    n_p.param<bool>("mm_to_meters", mm_to_meters, false);
 
     image_sub.subscribe(nh, image_topic, 1);
     depth_sub.subscribe(nh, depth_topic, 1);
@@ -73,9 +72,9 @@ rgbd_odom::rgbd_odom(ros::NodeHandle nh_) : it(nh_)
         minGradMagnitudes[2] = 3;
         minGradMagnitudes[3] = 1;
 
-        odom = new cv::rgbd::RgbdOdometry(
-            cam_intrinsics, MIN_DEPTH, MAX_DEPTH, MAX_DEPTH_DIFF, iterCounts,
-            minGradMagnitudes, MAX_POINTS_PART,
+        odom = new cv::rgbd::RgbdICPOdometry(
+            cam_intrinsics, MIN_DEPTH, MAX_DEPTH, MAX_DEPTH_DIFF,MAX_POINTS_PART, iterCounts,
+            minGradMagnitudes, 
             cv::rgbd::Odometry::RIGID_BODY_MOTION);
 }
 

@@ -53,7 +53,7 @@ typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sens
 
 class rgbd_odom
 {
-    cv::rgbd::RgbdOdometry *odom;
+    cv::rgbd::RgbdICPOdometry *odom;
     ///current image frame
     int frame;
     ///image dimensions
