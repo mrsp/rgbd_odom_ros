@@ -1,0 +1,5 @@
+image_topic: "/d400/color/image_raw"
+cam_info_topic: "/d400/aligned_depth_to_color/camera_info"
+depth_topic: "/d400/aligned_depth_to_color/image_raw"
+mm_to_meters: true
+image_freq: 30

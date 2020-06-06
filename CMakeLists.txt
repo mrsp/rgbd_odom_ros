@@ -45,7 +45,7 @@ include_directories(
   ${EIGEN3_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS}  
 )
 ## Declare a C++ executable
-add_executable(${PROJECT_NAME} src/rgbd_odom_driver.cpp src/rgbd_odom.cpp 
+add_executable(${PROJECT_NAME} src/rgbd_odom_driver.cpp src/rgbd_odom.cpp)
 
 target_link_libraries(${PROJECT_NAME}
   ${Boost_LIBRARIES}

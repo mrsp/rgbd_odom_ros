@@ -45,12 +45,15 @@
 #include "opencv2/rgbd.hpp"
 #include <eigen3/Eigen/Dense>
 #include <fstream>
+//#include <memory>
+
 using namespace std;
 
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> MySyncPolicy;
 
 class rgbd_odom
 {
+    cv::rgbd::RgbdOdometry *odom;
     ///current image frame
     int frame;
     ///image dimensions
@@ -68,14 +71,14 @@ class rgbd_odom
     /// Flags for first Image Callback, first Camera Info Callback, and for new image callback
     bool firstImageCb, firstCameraInfoCb, img_inc;
     // Flags for  checking VO initialization
-    bool  voInitialized, mm_to_meters ;
+    bool  voInitialized, mm_to_meters, isFirst;
     ///placeholders for previous and current Grayscale/RGB/Depth Image
     cv::Mat currImage, prevImage, currImageRGB, prevDepthImage, currDepthImage;
     cv::Mat  R,  t, cam_intrinsics; //
     ///Eigen 3D Rotation of Previous Image to Current Image Computed with Teaser (when 3D Estimation is ran)
-    Eigen::MatrixXd Rot_eig, R_f;
+    Eigen::MatrixXd R_f;
     ///Eigen 3D Translation of Previous Image to Current Image Computed with Teaser (when 3D Estimation is ran)
-    Eigen::VectorXd t_eig, t_f;
+    Eigen::VectorXd  t_f;
 
 
     ///ROS RGB Image Subscriber

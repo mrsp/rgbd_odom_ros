@@ -1,4 +1,4 @@
-#include <rgbd_odom_ros/rgbd_odom_ros.h>
+#include <rgbd_odom_ros/rgbd_odom.h>
 
 
 
@@ -19,7 +19,7 @@ rgbd_odom::rgbd_odom(ros::NodeHandle nh_) : it(nh_)
     img_inc = false;
     firstImageCb = true;
     firstCameraInfoCb = true;
-
+    isFirst = true;
     voInitialized = false;
 
     frame = 0;
@@ -30,10 +30,8 @@ rgbd_odom::rgbd_odom(ros::NodeHandle nh_) : it(nh_)
 
     R = cv::Mat::eye(3, 3, CV_64F);
     t = cv::Mat::zeros(3, 1, CV_64F);
-    Rot_eig.resize(3, 3);
-    Rot_eig.setIdentity();
-    t_eig.resize(3);
-    t_eig.setZero();
+
+
     cam_intrinsics = cv::Mat::zeros(3, 3, CV_64F);
     ros::NodeHandle n_p("~");
 
@@ -61,6 +59,24 @@ rgbd_odom::rgbd_odom(ros::NodeHandle nh_) : it(nh_)
             break;
         }
     }
+
+      ROS_INFO("Initializing RGBD Odometry");
+        vector<int> iterCounts(4);
+        iterCounts[0] = 7;
+        iterCounts[1] = 7;
+        iterCounts[2] = 7;
+        iterCounts[3] = 10;
+
+        vector<float> minGradMagnitudes(4);
+        minGradMagnitudes[0] = 12;
+        minGradMagnitudes[1] = 5;
+        minGradMagnitudes[2] = 3;
+        minGradMagnitudes[3] = 1;
+
+        odom = new cv::rgbd::RgbdOdometry(
+            cam_intrinsics, MIN_DEPTH, MAX_DEPTH, MAX_DEPTH_DIFF, iterCounts,
+            minGradMagnitudes, MAX_POINTS_PART,
+            cv::rgbd::Odometry::RIGID_BODY_MOTION);
 }
 
 void rgbd_odom::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sensor_msgs::ImageConstPtr &depth_msg)
@@ -123,6 +139,8 @@ void rgbd_odom::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const se
         currDepthImage = cv_depth_ptr->image;
         if (!voInitialized)
             voInitialized = true;
+        
+
     }
     frame++;
 }
@@ -146,8 +164,7 @@ void rgbd_odom::cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg)
         fy = msg->K[4];
         cy = msg->K[5];
 
-        pp.x = cx;
-        pp.y = cy;
+
         cam_intrinsics.at<double>(0, 0) = fx;
         cam_intrinsics.at<double>(0, 2) = cx;
         cam_intrinsics.at<double>(1, 1) = fx;
@@ -163,68 +180,81 @@ void rgbd_odom::run()
     if (!img_inc || !voInitialized)
         return;
 
-    Mat rigidTransform;
+    cv::Mat rigidTransform;
 
-    if (!odom)
-    {
-        vector<int> iterCounts(4);
-        iterCounts[0] = 7;
-        iterCounts[1] = 7;
-        iterCounts[2] = 7;
-        iterCounts[3] = 10;
+    bool isSuccess = odom->compute(prevImage, prevDepthImage, cv::Mat(), currImage,
+                                   currDepthImage, cv::Mat(), rigidTransform);
 
-        vector<float> minGradMagnitudes(4);
-        minGradMagnitudes[0] = 12;
-        minGradMagnitudes[1] = 5;
-        minGradMagnitudes[2] = 3;
-        minGradMagnitudes[3] = 1;
-
-        odom = std::make_shared<rgbd::RgbdOdometry>(
-            cam_intrinsics, MIN_DEPTH, MAX_DEPTH, MAX_DEPTH_DIFF, iterCounts,
-            minGradMagnitudes, MAX_POINTS_PART,
-            rgbd::Odometry::RIGID_BODY_MOTION);
-
-        std::cerr << "Init tracker" << std::endl;
-    }
-
-    bool isSuccess = odom->compute(grayImage0, depthFlt0, Mat(), grayImage1,
-                                   depthFlt1, Mat(), rigidTransform);
-
-    Mat rotationMat = rigidTransform(cv::Rect(0, 0, 3, 3)).clone();
-    Mat translateMat = rigidTransform(cv::Rect(3, 0, 1, 3)).clone();
+    cv::Mat rotationMat = rigidTransform(cv::Rect(0, 0, 3, 3)).clone();
+    cv::Mat translateMat = rigidTransform(cv::Rect(3, 0, 1, 3)).clone();
     // If compute successfully, then update rotationMatrix and tranlslationMatrix
     if (isSuccess == true)
     {
         if (isFirst == true)
         {
-            rotationMatrix = rotationMat.clone();
-            tranlslationMatrix = translateMat.clone();
+            R = rotationMat.clone();
+            t = translateMat.clone();
             isFirst = false;
-            continue;
         }
+        else
+        {
+             // Update Rt
+             t = t + (R * translateMat);
+             R = rotationMat * R;
 
-        // Update Rt
-        tranlslationMatrix = tranlslationMatrix + (rotationMatrix * translateMat);
-        rotationMatrix = rotationMat * rotationMatrix;
-    }
-
-    //Compute Visual Odometry
-    if ((t_eig(2) > t_eig(0)) && (t_eig(2) > t_eig(1)) && (scale > 0.01) && (scale <= 1.0))
-    //if ((scale > 0.01) && (scale <= 1.2))
-    {
-        t_f = t_f + scale * R_f * t_eig;
-        R_f = Rot_eig * R_f;
+        }
+        for(unsigned int i = 0 ; i<3 ; i++)
+        {
+            t_f(i) = t.at<double>(i);
+            for(unsigned int j = 0 ; j < 3 ; j++)
+            {
+                R_f(i,j) = R.at<double>(i,j);
+            }
+        }
+       
         curr_pose.translation() = t_f;
         curr_pose.linear() = R_f;
+         //Add Visual Odometry to a Path for Plotting in rviz
+        addTfToPath(curr_pose);
+        ROS_INFO("Visual Odometry");
+        std::cout << "Translation " << t_f << std::endl;
+        std::cout << "Rotation " << R_f << std::endl;
+
+        publishOdomPath();
     }
 
-    //Add Visual Odometry to a Path for Plotting in rviz
-    addTfToPath(curr_pose);
-    ROS_INFO("Visual Odometry");
-    std::cout << "Translation " << t_f << std::endl;
-    std::cout << "Rotation " << R_f << std::endl;
 
+   
     prevImage = currImage.clone();
     prevDepthImage = currDepthImage.clone();
     img_inc = false;
+}
+
+void rgbd_odom::addTfToPath(const Eigen::Affine3d &vision_pose)
+{
+    //Eigen::Affine3d pose=fromVisionCord(vision_pose);
+    Eigen::Affine3d pose = vision_pose;
+    Eigen::Quaterniond quat(pose.linear());
+
+    geometry_msgs::PoseStamped ps;
+    ps.header.stamp = ros::Time::now();
+    ps.header.frame_id = "odom";
+    ps.pose.position.x = pose.translation()(0);
+    ps.pose.position.y = pose.translation()(1);
+    ps.pose.position.z = pose.translation()(2);
+
+    ps.pose.orientation.x = quat.x();
+    ps.pose.orientation.y = quat.y();
+    ps.pose.orientation.z = quat.z();
+    ps.pose.orientation.w = quat.w();
+
+    odomPath.poses.push_back(ps);
+}
+
+void rgbd_odom::publishOdomPath()
+{
+    nav_msgs::Path newPath = odomPath;
+    newPath.header.stamp = ros::Time::now();
+    newPath.header.frame_id = "odom";
+    odom_path_pub.publish(newPath);
 }
