@@ -27,7 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /**
- * @brief RGBD Odometry with ROS
+ * @brief RGBD Odometry with ROS and openCV
  */
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
@@ -54,13 +54,13 @@ typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sens
 class rgbd_odom
 {
     cv::rgbd::RgbdICPOdometry *odom;
-    ///current image frame
+    /// current image frame
     int frame;
     ///image dimensions
     int height, width;
-    ///camera distorsion
+    /// camera distorsion
     double k1, k2, k3, t1, t2;
-    ///camera calibration
+    /// camera calibration
     double cx, cy, fx, fy;
     /// ROS nodehanlder
     ros::NodeHandle nh;
@@ -74,13 +74,13 @@ class rgbd_odom
     bool  voInitialized, mm_to_meters, isFirst;
     ///placeholders for previous and current Grayscale/RGB/Depth Image
     cv::Mat currImage, prevImage, currImageRGB, prevDepthImage, currDepthImage;
-    cv::Mat  R,  t, cam_intrinsics; //
-    ///Eigen 3D Rotation of Previous Image to Current Image Computed with Teaser (when 3D Estimation is ran)
+    /// camera matrix
+    cv::Mat cam_intrinsics; 
+    /// Visual Odometry in openCV type
+    cv::Mat  R,  t;
+    /// Visual Odometry in Eigen type
     Eigen::MatrixXd R_f;
-    ///Eigen 3D Translation of Previous Image to Current Image Computed with Teaser (when 3D Estimation is ran)
     Eigen::VectorXd  t_f;
-
-
     ///ROS RGB Image Subscriber
     message_filters::Subscriber<sensor_msgs::Image> image_sub;
     ///ROS DEPTH Image Subscriber
@@ -101,11 +101,9 @@ public:
      *  @param nh_ ros nodehandler 
 	 */
     rgbd_odom(ros::NodeHandle nh_);
-    /** @fn is3D()
-	 *  @brief return true if klt_ros finds 3d tfs.
-	 */
-    
-  
+    /** @fn void imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sensor_msgs::ImageConstPtr &depth_msg);
+     *  @brief synchronized callback for RGB and Depth 
+     */
     void imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sensor_msgs::ImageConstPtr &depth_msg);
     /** @fn void cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg);
      * @brief Camera Info Callback
@@ -115,14 +113,13 @@ public:
      * @brief computes visual odometry
      */
     void run();
-  
+    /** @fn void publishOdomPath()
+     *  @brief publish the computed VO as a ROS path msg
+     */
     void publishOdomPath();
     /** @fn void addTfToPath(const Eigen::Matrix4d &R_f, const Eigen::VectorXd &t_f)
      *  @param Matrix4d new tf     
      *  @brief add roatiaion R_f and translation t_f to odometry path for publishing later.
      */
     void addTfToPath(const Eigen::Affine3d &pose);
-    /** @fn void computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed);
-     *  @brief computes the pixel error of 2D detected Keypoints from current Image and 2D transformed Keypoints from previous Image
-     */
 };
