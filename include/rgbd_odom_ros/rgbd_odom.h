@@ -122,7 +122,17 @@ public:
      *  @brief add roatiaion R_f and translation t_f to odometry path for publishing later.
      */
     void addTfToPath(const Eigen::Affine3d &pose);
-    /** @fn void computeTransformedKeypointsError(std::vector<cv::KeyPoint> matched_currKeypoints, std::vector<cv::KeyPoint> matched_prevKeypoints_transformed);
-     *  @brief computes the pixel error of 2D detected Keypoints from current Image and 2D transformed Keypoints from previous Image
-     */
+    
+    inline Eigen::Affine3d fromVisionCord(const Eigen::Affine3d pose)
+    {
+   Eigen::Affine3d T_B_P;
+   T_B_P.translation() = Eigen::Vector3d::Zero();
+   T_B_P.linear() << 0,-1, 0, 0, 0, -1, 1, 0,  0;
+
+    
+    Eigen::Affine3d ret;
+    ret = T_B_P.inverse()*pose;
+    return ret;
+} 
+
 };

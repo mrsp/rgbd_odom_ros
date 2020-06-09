@@ -231,8 +231,7 @@ void rgbd_odom::run()
 
 void rgbd_odom::addTfToPath(const Eigen::Affine3d &vision_pose)
 {
-    //Eigen::Affine3d pose=fromVisionCord(vision_pose);
-    Eigen::Affine3d pose = vision_pose;
+    Eigen::Affine3d pose=fromVisionCord(vision_pose);
     Eigen::Quaterniond quat(pose.linear());
 
     geometry_msgs::PoseStamped ps;
