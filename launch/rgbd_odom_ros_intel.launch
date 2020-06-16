@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 <launch>
-    <!-- Call klt_ros -->
+    <!-- Call rgbd_odom_ros -->
     <node pkg="rgbd_odom_ros" type="rgbd_odom_ros" name="rgbd_odom_ros" respawn="false" output="screen" >
     <!-- Load configurations from YAML file to parameter server -->
         <rosparam file="$(find rgbd_odom_ros)/config/intel.yaml" command="load"/> 
     </node>
 
-    <node pkg = "rviz" type = "rviz" respawn = "false" name = "rviz" output = "screen" args ="-d $(find rgbd_odom_ros)/config/rgbd_ros_odom_intel.rviz"> </node>
+    <node pkg = "rviz" type = "rviz" respawn = "false" name = "rviz" output = "screen" args ="-d $(find rgbd_odom_ros)/config/rgbd_ros_odom.rviz"> </node>
   
 </launch>
