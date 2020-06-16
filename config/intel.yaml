@@ -3,3 +3,8 @@ cam_info_topic: "/d400/aligned_depth_to_color/camera_info"
 depth_topic: "/d400/aligned_depth_to_color/image_raw"
 mm_to_meters: true
 image_freq: 30
+min_depth: 0.8
+max_depth: 4.0
+max_depth_difference: 0.08
+max_points_part: 0.09
+publish_rate: 50

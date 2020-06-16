@@ -3,3 +3,8 @@ cam_info_topic: "/camera/rgb/camera_info"
 depth_topic: "/camera/depth_registered/sw_registered/image_rect"
 mm_to_meters: false
 image_freq: 30
+min_depth: 0.8
+max_depth: 4.0
+max_depth_difference: 0.08
+max_points_part: 0.09
+publish_rate: 50

@@ -62,6 +62,8 @@ class rgbd_odom
     double k1, k2, k3, t1, t2;
     /// camera calibration
     double cx, cy, fx, fy;
+    /// max/min depth measurement considered in meters, max depth difference in meters, max distance in points in meters, publish rate in Hz
+    double MAX_DEPTH, MIN_DEPTH, MAX_DEPTH_DIFF, MAX_POINTS_PART, publish_rate;
     /// ROS nodehanlder
     ros::NodeHandle nh;
     /// ROS image transport for image callback
@@ -125,13 +127,15 @@ public:
     
     inline Eigen::Affine3d fromVisionCord(const Eigen::Affine3d pose)
     {
-   Eigen::Affine3d T_B_P;
-   T_B_P.translation() = Eigen::Vector3d::Zero();
-   T_B_P.linear() << 0,-1, 0, 0, 0, -1, 1, 0,  0;
+   Eigen::Affine3d T_ROS_VISION;
+   T_ROS_VISION.translation() = Eigen::Vector3d::Zero();
+   T_ROS_VISION.linear() << 0,0,1,-1,0,0,0,-1,0;
 
     
+    
     Eigen::Affine3d ret;
-    ret = T_B_P.inverse()*pose;
+
+    ret.translation() = T_ROS_VISION * pose.translation();
     return ret;
 } 
 

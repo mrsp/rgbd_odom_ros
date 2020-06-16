@@ -1,14 +1,6 @@
 #include <rgbd_odom_ros/rgbd_odom.h>
 
 
-
-
-const float MIN_DEPTH = 0.8f;       // in meters
-const float MAX_DEPTH = 4.0f;       // in meters
-const float MAX_DEPTH_DIFF = 0.08f; // in meters
-const float MAX_POINTS_PART = 0.09f;
-
-
 rgbd_odom::rgbd_odom(ros::NodeHandle nh_) : it(nh_)
 {
 
@@ -29,15 +21,19 @@ rgbd_odom::rgbd_odom(ros::NodeHandle nh_) : it(nh_)
     R = cv::Mat::eye(3, 3, CV_64F);
     t = cv::Mat::zeros(3, 1, CV_64F);
 
-
     cam_intrinsics = cv::Mat::zeros(3, 3, CV_64F);
     ros::NodeHandle n_p("~");
 
     curr_pose = Eigen::Affine3d::Identity();
-    n_p.param<std::string>("image_topic", image_topic, "/camera/rgb/image_rect_color");
-    n_p.param<std::string>("depth_topic", depth_topic, "/camera/depth_registered/sw_registered/image_rect");
-    n_p.param<std::string>("cam_info_topic", cam_info_topic, "/camera/rgb/camera_info");
+    n_p.param<std::string>("image_topic", image_topic, "camera/rgb/image_rect_color");
+    n_p.param<std::string>("depth_topic", depth_topic, "camera/depth_registered/sw_registered/image_rect");
+    n_p.param<std::string>("cam_info_topic", cam_info_topic, "camera/rgb/camera_info");
     n_p.param<bool>("mm_to_meters", mm_to_meters, false);
+    n_p.param<double>("min_depth", MIN_DEPTH, 0.8);
+    n_p.param<double>("max_depth", MAX_DEPTH, 4.0);
+    n_p.param<double>("max_depth_difference", MAX_DEPTH_DIFF, 0.08);
+    n_p.param<double>("max_points_part", MAX_POINTS_PART, 0.09);
+    n_p.param<double>("publish_rate", publish_rate, 50);
 
     image_sub.subscribe(nh, image_topic, 1);
     depth_sub.subscribe(nh, depth_topic, 1);
@@ -46,7 +42,7 @@ rgbd_odom::rgbd_odom(ros::NodeHandle nh_) : it(nh_)
 
     ts_sync->registerCallback(boost::bind(&rgbd_odom::imageDepthCb, this, _1, _2));
 
-    odom_path_pub = n_p.advertise<nav_msgs::Path>("rgbd_odom/odom/path", 50);
+    odom_path_pub = n_p.advertise<nav_msgs::Path>("rgbd_odom/odom/path", publish_rate);
 
     ROS_INFO("Waiting camera info");
     while (ros::ok())
@@ -59,23 +55,23 @@ rgbd_odom::rgbd_odom(ros::NodeHandle nh_) : it(nh_)
         }
     }
 
-      ROS_INFO("Initializing RGBD Odometry");
-        vector<int> iterCounts(4);
-        iterCounts[0] = 7;
-        iterCounts[1] = 7;
-        iterCounts[2] = 7;
-        iterCounts[3] = 10;
+    ROS_INFO("Initializing RGBD Odometry");
+    vector<int> iterCounts(4);
+    iterCounts[0] = 7;
+    iterCounts[1] = 7;
+    iterCounts[2] = 7;
+    iterCounts[3] = 10;
 
-        vector<float> minGradMagnitudes(4);
-        minGradMagnitudes[0] = 12;
-        minGradMagnitudes[1] = 5;
-        minGradMagnitudes[2] = 3;
-        minGradMagnitudes[3] = 1;
+    vector<float> minGradMagnitudes(4);
+    minGradMagnitudes[0] = 12;
+    minGradMagnitudes[1] = 5;
+    minGradMagnitudes[2] = 3;
+    minGradMagnitudes[3] = 1;
 
-        odom = new cv::rgbd::RgbdICPOdometry(
-            cam_intrinsics, MIN_DEPTH, MAX_DEPTH, MAX_DEPTH_DIFF,MAX_POINTS_PART, iterCounts,
-            minGradMagnitudes, 
-            cv::rgbd::Odometry::RIGID_BODY_MOTION);
+    odom = new cv::rgbd::RgbdICPOdometry(
+        cam_intrinsics, MIN_DEPTH, MAX_DEPTH, MAX_DEPTH_DIFF, MAX_POINTS_PART, iterCounts,
+        minGradMagnitudes,
+        cv::rgbd::Odometry::RIGID_BODY_MOTION);
 }
 
 void rgbd_odom::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const sensor_msgs::ImageConstPtr &depth_msg)
@@ -138,8 +134,6 @@ void rgbd_odom::imageDepthCb(const sensor_msgs::ImageConstPtr &img_msg, const se
         currDepthImage = cv_depth_ptr->image;
         if (!voInitialized)
             voInitialized = true;
-        
-
     }
     frame++;
 }
@@ -162,7 +156,6 @@ void rgbd_odom::cameraInfoCb(const sensor_msgs::CameraInfoConstPtr &msg)
         cx = msg->K[2];
         fy = msg->K[4];
         cy = msg->K[5];
-
 
         cam_intrinsics.at<double>(0, 0) = fx;
         cam_intrinsics.at<double>(0, 2) = cx;
@@ -197,33 +190,30 @@ void rgbd_odom::run()
         }
         else
         {
-             // Update Rt
-             t = t + (R * translateMat);
-             R = rotationMat * R;
-
+            // Update Rt
+            t = t + (R * translateMat);
+            R = rotationMat * R;
         }
-        for(unsigned int i = 0 ; i<3 ; i++)
+        for (unsigned int i = 0; i < 3; i++)
         {
             t_f(i) = t.at<double>(i);
-            for(unsigned int j = 0 ; j < 3 ; j++)
+            for (unsigned int j = 0; j < 3; j++)
             {
-                R_f(i,j) = R.at<double>(i,j);
+                R_f(i, j) = R.at<double>(i, j);
             }
         }
-       
+
         curr_pose.translation() = t_f;
         curr_pose.linear() = R_f;
-         //Add Visual Odometry to a Path for Plotting in rviz
+        //Add Visual Odometry to a Path for Plotting in rviz
         addTfToPath(curr_pose);
         ROS_INFO("Visual Odometry");
-        std::cout << "Translation " << t_f << std::endl;
-        std::cout << "Rotation " << R_f << std::endl;
+        std::cout << "Translation " <<std::endl<< t_f << std::endl;
+        std::cout << "Rotation " <<std::endl<< R_f << std::endl;
 
         publishOdomPath();
     }
 
-
-   
     prevImage = currImage.clone();
     prevDepthImage = currDepthImage.clone();
     img_inc = false;
@@ -231,7 +221,9 @@ void rgbd_odom::run()
 
 void rgbd_odom::addTfToPath(const Eigen::Affine3d &vision_pose)
 {
-    Eigen::Affine3d pose=fromVisionCord(vision_pose);
+    //Eigen::Affine3d pose=fromVisionCord(vision_pose);
+    Eigen::Affine3d pose = vision_pose;
+
     Eigen::Quaterniond quat(pose.linear());
 
     geometry_msgs::PoseStamped ps;
